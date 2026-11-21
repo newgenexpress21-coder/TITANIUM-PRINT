@@ -1,0 +1,294 @@
+<title>Mesh Shield 3D Viewer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: CAD-style workspace. Viewport fills the left, a narrow property panel on the right; panel drops under the viewport on phones. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#14202b; --muted:#5b6875; --line:#d5dbe1;
+  --accent:#c0392b; --steel:#3d4550; --chip:#f3f5f7; --vp-top:#f7f9fb; --vp-bot:#d9dfe5;
+  --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --panel:#16202a; --ink:#e6ecf1; --muted:#93a1ae; --line:#2a3743;
+  --accent:#e0604f; --steel:#9aa7b4; --chip:#1d2a36; --vp-top:#1c2732; --vp-bot:#0c1218; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --panel:#16202a; --ink:#e6ecf1; --muted:#93a1ae; --line:#2a3743;
+  --accent:#e0604f; --steel:#9aa7b4; --chip:#1d2a36; --vp-top:#1c2732; --vp-bot:#0c1218; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;margin:0}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 340px;height:100%;min-height:560px}
+.vp{position:relative;min-width:0;background:linear-gradient(var(--vp-top),var(--vp-bot));overflow:hidden}
+#c{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#c:active{cursor:grabbing}
+.hud{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:16px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.hud .k{font:500 11px/1 var(--f-mono);letter-spacing:.12em;color:var(--accent);text-transform:uppercase}
+.hud h1{font:700 26px/1.1 var(--f-display);margin:0;text-wrap:balance}
+.hud .s{font:400 13px/1.4 var(--f-mono);color:var(--muted)}
+.views{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;display:flex;flex-wrap:wrap;gap:6px}
+.btn{font:500 12px/1 var(--f-mono);letter-spacing:.04em;padding:9px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--steel)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{position:absolute;right:16px;bottom:16px;font:400 11px/1.4 var(--f-mono);color:var(--muted);text-align:right;pointer-events:none}
+.labels{position:absolute;inset:0;pointer-events:none}
+.lbl{position:absolute;transform:translate(-50%,-50%);font:500 11px/1 var(--f-mono);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:4px 6px;white-space:nowrap}
+.lbl.dim{border-color:var(--accent);color:var(--accent)}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding-block:20px;padding-left:20px;padding-right:max(20px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px;min-width:0}
+aside h2{font:500 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.slider{display:flex;flex-direction:column;gap:8px}
+.slider input{width:100%;accent-color:var(--accent)}
+.parts{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
+.parts li{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer}
+.parts li:hover,.parts li.on{background:var(--chip)}
+.parts li.off{opacity:.4}
+.sw{width:12px;height:12px;border-radius:3px}
+.parts .n{font-weight:600}
+.parts .q{font:400 12px/1 var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+.spec dt{color:var(--muted)}
+.spec dd{margin:0;font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.note{color:var(--muted);line-height:1.5;margin:0}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:62vh auto;height:auto}
+  aside{border-left:0;border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <div class="vp" id="vp">
+    <canvas id="c" aria-label="3D model of the safety mesh cover shield. Drag to orbit, scroll or pinch to zoom."></canvas>
+    <div class="labels" id="labels"></div>
+    <div class="hud">
+      <span class="k">D0867-1701 · Rev D · 96-PCV-861</span>
+      <h1>Safety Mesh Cover Shield</h1>
+      <span class="s">Ø410 × 818 · 2 halves · 20 mm gap · 4 × M8 at end frames</span>
+    </div>
+    <div class="views" role="group" aria-label="Preset views">
+      <button class="btn" data-view="iso" aria-pressed="true">Iso</button>
+      <button class="btn" data-view="rear">Rear iso</button>
+      <button class="btn" data-view="side">Side</button>
+      <button class="btn" data-view="end">End</button>
+      <button class="btn" data-view="top">Top</button>
+      <button class="btn" data-view="bottom">Bottom</button>
+    </div>
+    <div class="hint">Drag: orbit · Right-drag: pan · Scroll: zoom</div>
+  </div>
+
+  <aside>
+    <section>
+      <h2>Explode halves</h2>
+      <div class="slider">
+        <input type="range" id="explode" min="0" max="260" value="0" aria-label="Separate half A and half B">
+        <div class="row"><span class="note">Closed</span><span class="note" id="gap">gap 20 mm</span><span class="note">Apart</span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Display</h2>
+      <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:6px">
+        <button class="btn" id="tDims" aria-pressed="true">Dimensions</button>
+        <button class="btn" id="tSpin" aria-pressed="false">Auto-rotate</button>
+        <button class="btn" id="tHalf" aria-pressed="false">Half A only</button>
+      </div>
+    </section>
+    <section>
+      <h2>Parts · click to show / hide</h2>
+      <ul class="parts" id="parts"></ul>
+    </section>
+    <section>
+      <h2>Key data</h2>
+      <dl class="spec">
+        <dt>Shell</dt><dd>Ø410 OD × 818</dd>
+        <dt>Mesh</dt><dd>Aluminium thk 5</dd>
+        <dt>Frame</dt><dd>Flat bar 25 × 5</dd>
+        <dt>Rings at</dt><dd>30 · 185 · 608 · 763</dd>
+        <dt>Long bars</dt><dd>±43° · 4 nos</dd>
+        <dt>End ring</dt><dd>Ø300 ID</dd>
+        <dt>Bonnet opening</dt><dd>350 × 243 (ref.)</dd>
+        <dt>Gap</dt><dd>20 mm between halves</dd>
+        <dt>Fixing</dt><dd>4 × M8×50 + 20 spacer</dd>
+      </dl>
+    </section>
+    <p class="note">Same geometry as the 3D model file D0867-1701_3D_MODEL_RevD.dxf. Valve flanges (Ø300) fit inside the end rings; the bonnet passes up through the top opening.</p>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const L=818,R=205,RI=150,W=25,T=5,GAP=20,GA=(GAP/2/R)*180/Math.PI,EDA=(W/R)*180/Math.PI;
+const RINGS=[[30,55],[185,210],[608,633],[763,788]];
+const OPX=[234,584], OP_HALF=Math.acos((R-40)/R)*180/Math.PI, LANG=Math.asin(140/R)*180/Math.PI;
+const SPOKES=[0,35,70,-35,-70];
+const rad=d=>d*Math.PI/180;
+// model coords: x = pipe axis, lateral y, up z  ->  three: (x, z, y)
+const P=(x,y,z)=>[x-L/2,z,y];
+const cyl=(x,r,a)=>P(x,r*Math.cos(rad(a)),r*Math.sin(rad(a)));
+
+function geom(quads){ // quads: list of 4 points
+  const pos=[];
+  for(const q of quads){ pos.push(...q[0],...q[1],...q[2], ...q[0],...q[2],...q[3]); }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.computeVertexNormals(); return g;
+}
+function sector(x0,x1,r0,r1,a0,a1,n=36){
+  const q=[]; const A=[...Array(n+1)].map((_,i)=>a0+(a1-a0)*i/n);
+  for(let i=0;i<n;i++){const a=A[i],b=A[i+1];
+    q.push([cyl(x0,r1,a),cyl(x1,r1,a),cyl(x1,r1,b),cyl(x0,r1,b)]);
+    q.push([cyl(x0,r0,b),cyl(x1,r0,b),cyl(x1,r0,a),cyl(x0,r0,a)]);
+    q.push([cyl(x0,r0,a),cyl(x0,r1,a),cyl(x0,r1,b),cyl(x0,r0,b)]);
+    q.push([cyl(x1,r0,b),cyl(x1,r1,b),cyl(x1,r1,a),cyl(x1,r0,a)]);}
+  q.push([cyl(x0,r0,a0),cyl(x1,r0,a0),cyl(x1,r1,a0),cyl(x0,r1,a0)]);
+  q.push([cyl(x0,r1,a1),cyl(x1,r1,a1),cyl(x1,r0,a1),cyl(x0,r0,a1)]);
+  return geom(q);
+}
+function boxAt(c,ax,size){ // ax: 3 unit vectors in model coords
+  const pts=[]; for(const sx of[-1,1])for(const sy of[-1,1])for(const sz of[-1,1]){
+    const p=[0,1,2].map(k=>c[k]+sx*ax[0][k]*size[0]/2+sy*ax[1][k]*size[1]/2+sz*ax[2][k]*size[2]/2); pts.push(P(...p));}
+  const f=[[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]];
+  return geom(f.map(F=>F.map(i=>pts[i])));
+}
+const radial=a=>[[0,Math.cos(rad(a)),Math.sin(rad(a))],[0,-Math.sin(rad(a)),Math.cos(rad(a))]];
+function shell(a0,a1){
+  const nx=80,na=60,rm=R-T/2,pos=[],uv=[];
+  for(let i=0;i<nx;i++)for(let j=0;j<na;j++){
+    const x0=L*i/nx,x1=L*(i+1)/nx,b0=a0+(a1-a0)*j/na,b1=a0+(a1-a0)*(j+1)/na;
+    const xm=(x0+x1)/2, am=(b0+b1)/2, d=Math.abs(((am-90+180)%360+360)%360-180);
+    if(xm>OPX[0]&&xm<OPX[1]&&d<OP_HALF) continue;
+    const p=[cyl(x0,rm,b0),cyl(x1,rm,b0),cyl(x1,rm,b1),cyl(x0,rm,b1)];
+    const u=[[x0,b0],[x1,b0],[x1,b1],[x0,b1]].map(([x,b])=>[x/18,b*Math.PI/180*rm/18]);
+    for(const k of[0,1,2,0,2,3]){pos.push(...p[k]);uv.push(...u[k]);}
+  }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.computeVertexNormals(); return g;
+}
+function meshTexture(){
+  const s=64,c=document.createElement('canvas'); c.width=c.height=s; const x=c.getContext('2d');
+  x.clearRect(0,0,s,s); x.strokeStyle='#b4bcc5'; x.lineWidth=5;
+  x.beginPath(); x.moveTo(0,s/2);x.lineTo(s,s/2);x.moveTo(s/2,0);x.lineTo(s/2,s); x.stroke();
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t;
+}
+
+const PARTS=[
+  {k:'shell',n:'Mesh shell',q:'2 halves',c:'#aab4be'},
+  {k:'ring',n:'Rings FB 25×5',q:'4',c:'#5b6470'},
+  {k:'bar',n:'Long bars + flush edge bars',q:'4 + 6',c:'#5b6470'},
+  {k:'endring',n:'End rings Ø300 ID',q:'2',c:'#2f3740'},
+  {k:'stay',n:'Radial stays',q:'20',c:'#2f3740'},
+  {k:'lug',n:'Joint brackets (end frames)',q:'8',c:'#c0392b'},
+  {k:'bolt',n:'M8×50 bolts, nuts, spacers',q:'4 sets',c:'#1f4e9c'},
+];
+const mats={};
+for(const p of PARTS){
+  mats[p.k]= p.k==='shell'
+    ? new THREE.MeshStandardMaterial({color:0xe6eaee,map:meshTexture(),transparent:true,alphaTest:0.25,side:THREE.DoubleSide,metalness:.5,roughness:.45})
+    : new THREE.MeshStandardMaterial({color:p.c,metalness:p.k==='bolt'?.7:.55,roughness:.4,side:THREE.DoubleSide});
+}
+// shell texture: use alpha from canvas
+mats.shell.map.format=THREE.RGBAFormat;
+
+const halves={A:new THREE.Group(),B:new THREE.Group()}, byPart={};
+function add(h,k,g){const m=new THREE.Mesh(g,mats[k]); m.userData.part=k; halves[h].add(m); (byPart[k]=byPart[k]||[]).push(m);}
+for(const h of['A','B']){
+  const [a0,a1]=h==='A'?[90+GA,270-GA]:[-90+GA,90-GA], side=h==='A'?-1:1;
+  add(h,'shell',shell(a0,a1));
+  for(const [x0,x1] of RINGS) add(h,'ring',sector(x0,x1,R,R+T,a0,a1));
+  for(const ang of (h==='A'?[180-LANG,180+LANG]:[LANG,-LANG])){
+    const [r,t]=radial(ang); add(h,'bar',boxAt([L/2,(R+T/2)*r[1],(R+T/2)*r[2]],[[1,0,0],t,r],[L,W,T]));}
+  for(const xe of[0,L-T]){
+    const dai=(GAP/2/(RI+W))*180/Math.PI-GA; add(h,'endring',sector(xe,xe+T,RI,RI+W,a0+dai,a1-dai,30));
+    const xc=xe===0?W/2:L-W/2, rm=(RI+W+R-T)/2;
+    for(const a of SPOKES){const ang=h==='B'?a:180-a; const [r,t]=radial(ang);
+      add(h,'stay',boxAt([xc,rm*r[1],rm*r[2]],[[1,0,0],t,r],[W,T,R-T-RI-W]));}
+    for(const z of[1,-1]) add(h,'lug',boxAt([xc,side*(GAP/2+T/2),z*rm],[[1,0,0],[0,1,0],[0,0,1]],[W,T,R-T-RI-W]));
+  }
+  const top=h==='A'?[a0,a0+EDA]:[a1-EDA,a1], bot=h==='A'?[a1-EDA,a1]:[a0,a0+EDA];
+  add(h,'bar',sector(0,L,R,R+T,bot[0],bot[1],4));
+  for(const [xa,xb] of [[0,OPX[0]],[OPX[1],L]]) add(h,'bar',sector(xa,xb,R,R+T,top[0],top[1],4));
+}
+const bolts=new THREE.Group();
+const bpts=[]; for(const xe of[W/2,L-W/2]) for(const z of[1,-1]) bpts.push([xe,z*(RI+W+R-T)/2]);
+const spacerMat=new THREE.MeshStandardMaterial({color:0x2f8f6f,metalness:.5,roughness:.4});
+function cylY(rad,len,y,x,z,mat,seg=16){const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,seg),mat);
+  m.position.set(...P(x,y,z)); m.rotation.x=Math.PI/2; m.userData.part='bolt'; bolts.add(m); (byPart.bolt=byPart.bolt||[]).push(m); return m;}
+for(const [x,z] of bpts){
+  cylY(4,50,4,x,z,mats.bolt);                       // shank M8x50
+  cylY(7.5,5.3,-(GAP/2+T+3.6+2.65),x,z,mats.bolt,6); // hex head
+  cylY(7.5,6.5,GAP/2+T+5.6+3.25,x,z,mats.bolt,6);    // hex nut
+  cylY(8,3.6,-(GAP/2+T+1.8),x,z,mats.shell?mats.ring:mats.ring); // washers
+  cylY(8,3.6,GAP/2+T+1.8,x,z,mats.ring);
+  cylY(7,GAP,0,x,z,spacerMat);                      // 20 spacer
+}
+
+// ---------- scene
+const canvas=document.getElementById('c'), vp=document.getElementById('vp');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(32,1,10,20000);
+scene.add(halves.A,halves.B,bolts);
+scene.add(new THREE.HemisphereLight(0xffffff,0x8a96a3,0.9));
+const d1=new THREE.DirectionalLight(0xffffff,0.8); d1.position.set(-600,900,-700); scene.add(d1);
+const d2=new THREE.DirectionalLight(0xffffff,0.35); d2.position.set(700,300,800); scene.add(d2);
+const grid=new THREE.GridHelper(2000,40,0x9aa5b0,0xc3cbd3); grid.position.y=-R-60; grid.material.transparent=true; grid.material.opacity=.35; scene.add(grid);
+const controls=new THREE.OrbitControls(camera,canvas); controls.enableDamping=true; controls.dampingFactor=.08; controls.minDistance=300; controls.maxDistance=5000;
+
+const VIEWS={iso:[-1,0.75,-1.05],rear:[1,0.7,1.05],side:[0,0,-1],end:[-1,0,0],top:[0,1,0.0001],bottom:[0,-1,0.0001]};
+let anim=null;
+function setView(k,instant){
+  const v=new THREE.Vector3(...VIEWS[k]).normalize().multiplyScalar(1900);
+  const from=camera.position.clone(), t0=performance.now(), dur=instant||matchMedia('(prefers-reduced-motion: reduce)').matches?0:650;
+  controls.target.set(0,0,0);
+  anim={from,to:v,t0,dur};
+  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===k)));
+}
+document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+
+// explode
+const ex=document.getElementById('explode'), gapEl=document.getElementById('gap');
+function setExplode(v){halves.A.position.z=-v; halves.B.position.z=v; bolts.visible=v<20&&partOn.bolt; gapEl.textContent='gap '+(20+2*v)+' mm';}
+ex.addEventListener('input',()=>setExplode(+ex.value));
+
+// parts list
+const partOn={}; const ul=document.getElementById('parts');
+for(const p of PARTS){partOn[p.k]=true;
+  const li=document.createElement('li'); li.tabIndex=0; li.setAttribute('role','button'); li.setAttribute('aria-pressed','true');
+  li.innerHTML=`<span class="sw" style="background:${p.c}"></span><span class="n">${p.n}</span><span class="q">${p.q}</span>`;
+  const tog=()=>{partOn[p.k]=!partOn[p.k]; li.classList.toggle('off',!partOn[p.k]); li.setAttribute('aria-pressed',String(partOn[p.k]));
+    for(const m of byPart[p.k]) m.visible=partOn[p.k]; if(p.k==='bolt') setExplode(+ex.value);};
+  li.addEventListener('click',tog); li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tog();}});
+  li.addEventListener('mouseenter',()=>{for(const m of byPart[p.k]) m.material.emissive&&m.material.emissive.setHex(0x331100);});
+  li.addEventListener('mouseleave',()=>{for(const m of byPart[p.k]) m.material.emissive&&m.material.emissive.setHex(0x000000);});
+  ul.appendChild(li);}
+
+// toggles
+function toggle(id,fn){const b=document.getElementById(id); b.addEventListener('click',()=>{const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',String(on)); fn(on);});}
+let showDims=true; toggle('tDims',on=>{showDims=on; labelsEl.hidden=!on;});
+toggle('tSpin',on=>{controls.autoRotate=on; controls.autoRotateSpeed=1.2;});
+toggle('tHalf',on=>{halves.B.visible=!on; bolts.visible=!on&&+ex.value<20;});
+
+// labels (projected HTML)
+const labelsEl=document.getElementById('labels');
+const LBL=[
+  {t:'818',p:P(L/2,-R-40,-R-10),dim:1},{t:'Ø410',p:P(-10,-R-30,R+40),dim:1},
+  {t:'Ø300 end ring',p:P(-5,0,-RI-12)},{t:'Bonnet opening 350',p:P(L/2,0,R+70)},
+  {t:'Bolted joint (top)',p:P(-10,0,R+40)},{t:'20 mm gap',p:P(110,0,R+40)},{t:'Half A',p:P(L/2,-R-90,0)},{t:'Half B',p:P(L/2,R+90,0)}
+].map(o=>{const el=document.createElement('div'); el.className='lbl'+(o.dim?' dim':''); el.textContent=o.t; labelsEl.appendChild(el); return {...o,el,v:new THREE.Vector3(...o.p)};});
+function updLabels(w,h){if(!showDims)return; for(const o of LBL){
+  const v=o.v.clone(); if(o.t==='Half A')v.z+=halves.A.position.z; if(o.t==='Half B')v.z+=halves.B.position.z;
+  v.project(camera); const vis=v.z<1; o.el.style.display=vis?'':'none';
+  o.el.style.left=((v.x+1)/2*w)+'px'; o.el.style.top=((1-v.y)/2*h)+'px';}}
+
+function resize(){const w=vp.clientWidth,h=vp.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); return [w,h];}
+let size=resize(); new ResizeObserver(()=>{size=resize();}).observe(vp);
+camera.position.set(...new THREE.Vector3(...VIEWS.iso).normalize().multiplyScalar(1900).toArray());
+setView('iso',true);
+function frame(now){
+  if(anim){const k=anim.dur?Math.min(1,(now-anim.t0)/anim.dur):1, e=1-Math.pow(1-k,3);
+    camera.position.lerpVectors(anim.from,anim.to,e); if(k>=1)anim=null;}
+  controls.update(); renderer.render(scene,camera); updLabels(size[0],size[1]); requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+})();
+</script>
