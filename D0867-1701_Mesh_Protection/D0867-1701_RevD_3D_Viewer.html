@@ -108,6 +108,7 @@ aside h2{font:500 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:upper
         <dt>End ring</dt><dd>Ø300 ID</dd>
         <dt>Bonnet opening</dt><dd>350 × 243 (ref.)</dd>
         <dt>Gap</dt><dd>20 mm between halves</dd>
+        <dt>Mesh overhang</dt><dd>25 beyond end frame</dd>
         <dt>Fixing</dt><dd>4 × M8×50 + 20 spacer</dd>
       </dl>
     </section>
@@ -119,7 +120,7 @@ aside h2{font:500 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:upper
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (function(){
-const L=818,R=205,RI=150,W=25,T=5,GAP=20,GA=(GAP/2/R)*180/Math.PI,EDA=(W/R)*180/Math.PI;
+const L=818,R=205,RI=150,W=25,T=5,GAP=20,OV=25,GA=(GAP/2/R)*180/Math.PI,EDA=(W/R)*180/Math.PI;
 const RINGS=[[30,55],[185,210],[608,633],[763,788]];
 const OPX=[234,584], OP_HALF=Math.acos((R-40)/R)*180/Math.PI, LANG=Math.asin(140/R)*180/Math.PI;
 const SPOKES=[0,35,70,-35,-70];
@@ -197,9 +198,9 @@ for(const h of['A','B']){
   for(const [x0,x1] of RINGS) add(h,'ring',sector(x0,x1,R,R+T,a0,a1));
   for(const ang of (h==='A'?[180-LANG,180+LANG]:[LANG,-LANG])){
     const [r,t]=radial(ang); add(h,'bar',boxAt([L/2,(R+T/2)*r[1],(R+T/2)*r[2]],[[1,0,0],t,r],[L,W,T]));}
-  for(const xe of[0,L-T]){
+  for(const xe of[OV,L-OV-T]){
     const dai=(GAP/2/(RI+W))*180/Math.PI-GA; add(h,'endring',sector(xe,xe+T,RI,RI+W,a0+dai,a1-dai,30));
-    const xc=xe===0?W/2:L-W/2, rm=(RI+W+R-T)/2;
+    const xc=xe<L/2?xe+W/2:xe+T-W/2, rm=(RI+W+R-T)/2;
     for(const a of SPOKES){const ang=h==='B'?a:180-a; const [r,t]=radial(ang);
       add(h,'stay',boxAt([xc,rm*r[1],rm*r[2]],[[1,0,0],t,r],[W,T,R-T-RI-W]));}
     for(const z of[1,-1]) add(h,'lug',boxAt([xc,side*(GAP/2+T/2),z*rm],[[1,0,0],[0,1,0],[0,0,1]],[W,T,R-T-RI-W]));
@@ -209,7 +210,7 @@ for(const h of['A','B']){
   for(const [xa,xb] of [[0,OPX[0]],[OPX[1],L]]) add(h,'bar',sector(xa,xb,R,R+T,top[0],top[1],4));
 }
 const bolts=new THREE.Group();
-const bpts=[]; for(const xe of[W/2,L-W/2]) for(const z of[1,-1]) bpts.push([xe,z*(RI+W+R-T)/2]);
+const bpts=[]; for(const xe of[OV+W/2,L-OV-W/2]) for(const z of[1,-1]) bpts.push([xe,z*(RI+W+R-T)/2]);
 const spacerMat=new THREE.MeshStandardMaterial({color:0x2f8f6f,metalness:.5,roughness:.4});
 function cylY(rad,len,y,x,z,mat,seg=16){const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,seg),mat);
   m.position.set(...P(x,y,z)); m.rotation.x=Math.PI/2; m.userData.part='bolt'; bolts.add(m); (byPart.bolt=byPart.bolt||[]).push(m); return m;}
